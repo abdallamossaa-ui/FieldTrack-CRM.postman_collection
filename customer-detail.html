@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Customer · FieldTrack CRM</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="nav-placeholder"></div>
+
+  <div class="container" id="page-content" style="display:none;">
+    <div class="page-title" id="customer-name">Customer</div>
+
+    <div class="card">
+      <div class="meta" id="customer-meta" style="color:var(--muted);font-size:14px;"></div>
+      <a class="maps-link" id="maps-link" href="#" target="_blank" rel="noopener noreferrer" style="margin-top:8px;">
+        📍 Open in Google Maps
+      </a>
+      <div id="customer-notes" style="margin-top:10px;font-size:14px;"></div>
+
+      <div style="display:flex;gap:8px;margin-top:14px;">
+        <button class="btn btn-outline btn-sm" onclick="toggleEdit()">Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteCustomer()">Delete</button>
+      </div>
+    </div>
+
+    <div class="card" id="edit-card" style="display:none;">
+      <div class="section-label" style="margin-top:0;">Edit Customer</div>
+      <form id="edit-form">
+        <div class="form-group">
+          <label for="edit-name">Customer Name</label>
+          <input type="text" id="edit-name" required>
+        </div>
+        <div class="form-group">
+          <label for="edit-phone">Phone</label>
+          <input type="tel" id="edit-phone">
+        </div>
+        <div class="form-group">
+          <label for="edit-address">Address / Location</label>
+          <input type="text" id="edit-address" required>
+        </div>
+        <div class="form-group">
+          <label for="edit-notes">Notes</label>
+          <textarea id="edit-notes"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Save Changes</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="section-label" style="margin-top:0;">Log a Visit</div>
+      <form id="visit-form">
+        <div class="form-group">
+          <label for="visit-status">Status</label>
+          <select id="visit-status">
+            <option>New</option>
+            <option>Interested</option>
+            <option>Follow-up</option>
+            <option>Closed</option>
+            <option>Lost</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="visit-notes">Notes</label>
+          <textarea id="visit-notes" placeholder="What happened on this visit?"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" id="visit-submit-btn">Add Visit</button>
+      </form>
+    </div>
+
+    <div class="section-label">Visit History</div>
+    <div id="visit-history"><div class="loading">Loading…</div></div>
+  </div>
+
+  <div id="page-loading" class="loading">Loading…</div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/nav.js"></script>
+  <script>
+    requireLogin();
+    renderNav('customers');
+
+    const params = new URLSearchParams(window.location.search);
+    const customerId = params.get('id');
+    if (!customerId) window.location.href = '/customers.html';
+
+    let currentCustomer = null;
+
+    function toggleEdit() {
+      const card = document.getElementById('edit-card');
+      card.style.display = card.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function renderCustomer(c) {
+      currentCustomer = c;
+      document.getElementById('customer-name').textContent = c.name;
+      document.getElementById('customer-meta').innerHTML = `
+        ${c.phone ? escapeHtml(c.phone) + ' · ' : ''}
+        <span class="badge ${statusBadgeClass(c.latestStatus)}">${escapeHtml(c.latestStatus)}</span>
+        · Owner: ${escapeHtml(c.assignedToName || '')}
+        · Last visit: ${timeAgo(c.lastVisit)}
+      `;
+      document.getElementById('maps-link').href = c.location;
+      document.getElementById('customer-notes').textContent = c.notes || '';
+
+      document.getElementById('edit-name').value = c.name;
+      document.getElementById('edit-phone').value = c.phone || '';
+      document.getElementById('edit-address').value = c.address;
+      document.getElementById('edit-notes').value = c.notes || '';
+
+      document.getElementById('page-content').style.display = 'block';
+      document.getElementById('page-loading').style.display = 'none';
+    }
+
+    function renderHistory(visits) {
+      const el = document.getElementById('visit-history');
+      if (visits.length === 0) {
+        el.innerHTML = `<div class="empty-state">No visits logged yet.</div>`;
+        return;
+      }
+      el.innerHTML = `<div class="card">` + visits.map(v => `
+        <div class="visit-item">
+          <div class="top-row">
+            <span class="badge ${statusBadgeClass(v.status)}">${escapeHtml(v.status)}</span>
+            <span class="date">${timeAgo(v.createdAt)}</span>
+          </div>
+          ${v.notes ? `<div class="notes">${escapeHtml(v.notes)}</div>` : ''}
+        </div>
+      `).join('') + `</div>`;
+    }
+
+    async function loadAll() {
+      try {
+        const [customer, visits] = await Promise.all([
+          api.get(`/customers/${customerId}`),
+          api.get(`/visits/customer/${customerId}`)
+        ]);
+        renderCustomer(customer);
+        renderHistory(visits);
+      } catch (err) {
+        showToast(err.message, 'error');
+        setTimeout(() => window.location.href = '/customers.html', 1200);
+      }
+    }
+
+    document.getElementById('edit-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        const payload = {
+          name: document.getElementById('edit-name').value.trim(),
+          phone: document.getElementById('edit-phone').value.trim(),
+          address: document.getElementById('edit-address').value.trim(),
+          notes: document.getElementById('edit-notes').value.trim()
+        };
+        const updated = await api.put(`/customers/${customerId}`, payload);
+        showToast('Customer updated.', 'success');
+        toggleEdit();
+        loadAll();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    });
+
+    document.getElementById('visit-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('visit-submit-btn');
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+      try {
+        await api.post('/visits', {
+          customerId,
+          status: document.getElementById('visit-status').value,
+          notes: document.getElementById('visit-notes').value.trim()
+        });
+        document.getElementById('visit-notes').value = '';
+        showToast('Visit logged.', 'success');
+        loadAll();
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Add Visit';
+      }
+    });
+
+    async function deleteCustomer() {
+      if (!confirm(`Delete ${currentCustomer.name}? This also deletes their visit history.`)) return;
+      try {
+        await api.del(`/customers/${customerId}`);
+        showToast('Customer deleted.', 'success');
+        window.location.href = '/customers.html';
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    loadAll();
+  </script>
+</body>
+</html>

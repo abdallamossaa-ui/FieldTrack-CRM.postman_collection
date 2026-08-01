@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Dashboard · FieldTrack CRM</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="nav-placeholder"></div>
+
+  <div class="container">
+    <div class="page-title">Dashboard</div>
+
+    <div class="stats-row">
+      <div class="stat-box">
+        <div class="num" id="stat-customers">–</div>
+        <div class="label">Customers</div>
+      </div>
+      <div class="stat-box">
+        <div class="num" id="stat-visits">–</div>
+        <div class="label">Visits Logged</div>
+      </div>
+    </div>
+
+    <div class="section-label">Recent Visits</div>
+    <div id="feed"><div class="loading">Loading…</div></div>
+  </div>
+
+  <a href="/customers-new.html" class="fab" title="Add customer">＋</a>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/nav.js"></script>
+  <script>
+    requireLogin();
+    renderNav('dashboard');
+
+    async function loadDashboard() {
+      try {
+        const data = await api.get('/dashboard');
+        document.getElementById('stat-customers').textContent = data.totalCustomers;
+        document.getElementById('stat-visits').textContent = data.totalVisits;
+
+        const feed = document.getElementById('feed');
+        if (data.recentVisits.length === 0) {
+          feed.innerHTML = `
+            <div class="empty-state">
+              <div class="big">🗒️</div>
+              No visits logged yet.<br>Add a customer and log your first visit.
+            </div>`;
+          return;
+        }
+
+        feed.innerHTML = data.recentVisits.map(v => `
+          <div class="card">
+            <div class="visit-item" style="border-left:none;padding-left:0;">
+              <div class="top-row">
+                <a href="/customer-detail.html?id=${encodeURIComponent(v.customerId)}" style="text-decoration:none;color:inherit;font-weight:700;">
+                  ${escapeHtml(v.customerName)}
+                </a>
+                <span class="badge ${statusBadgeClass(v.status)}">${escapeHtml(v.status)}</span>
+              </div>
+              ${v.notes ? `<div class="notes">${escapeHtml(v.notes)}</div>` : ''}
+              <div class="by">by ${escapeHtml(v.salesmanName)} · ${timeAgo(v.createdAt)}</div>
+            </div>
+          </div>
+        `).join('');
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    loadDashboard();
+    // Live-ish updates: poll every 15 seconds
+    setInterval(loadDashboard, 15000);
+  </script>
+</body>
+</html>

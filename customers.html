@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Customers · FieldTrack CRM</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="nav-placeholder"></div>
+
+  <div class="container">
+    <div class="page-title">My Customers</div>
+
+    <div class="search-bar">
+      <input type="text" id="search" placeholder="Search by name or phone…">
+    </div>
+
+    <div id="list"><div class="loading">Loading…</div></div>
+  </div>
+
+  <a href="/customers-new.html" class="fab" title="Add customer">＋</a>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/nav.js"></script>
+  <script>
+    requireLogin();
+    renderNav('customers');
+
+    let allCustomers = [];
+
+    function render(list) {
+      const el = document.getElementById('list');
+      if (list.length === 0) {
+        el.innerHTML = `
+          <div class="empty-state">
+            <div class="big">👤</div>
+            No customers yet.<br>Tap the + button to add your first one.
+          </div>`;
+        return;
+      }
+
+      el.innerHTML = list.map(c => `
+        <div class="card customer-item">
+          <div class="info">
+            <a href="/customer-detail.html?id=${encodeURIComponent(c.id)}" style="text-decoration:none;color:inherit;">
+              <div class="name">${escapeHtml(c.name)}</div>
+            </a>
+            <div class="meta">
+              ${c.phone ? escapeHtml(c.phone) + ' · ' : ''}
+              <span class="badge ${statusBadgeClass(c.latestStatus)}">${escapeHtml(c.latestStatus)}</span>
+              · Last visit: ${timeAgo(c.lastVisit)}
+            </div>
+            <a class="maps-link" href="${c.location}" target="_blank" rel="noopener noreferrer">
+              📍 Open in Google Maps
+            </a>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function loadCustomers() {
+      try {
+        allCustomers = await api.get('/customers');
+        render(allCustomers);
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    document.getElementById('search').addEventListener('input', (e) => {
+      const q = e.target.value.trim().toLowerCase();
+      if (!q) return render(allCustomers);
+      render(allCustomers.filter(c =>
+        c.name.toLowerCase().includes(q) || (c.phone || '').toLowerCase().includes(q)
+      ));
+    });
+
+    loadCustomers();
+  </script>
+</body>
+</html>

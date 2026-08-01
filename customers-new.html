@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Add Customer · FieldTrack CRM</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="nav-placeholder"></div>
+
+  <div class="container">
+    <div class="page-title">Add Customer</div>
+
+    <div class="card">
+      <form id="new-form">
+        <div class="form-group">
+          <label for="name">Customer Name</label>
+          <input type="text" id="name" required placeholder="e.g. Green Valley Store">
+        </div>
+        <div class="form-group">
+          <label for="phone">Phone</label>
+          <input type="tel" id="phone" placeholder="e.g. +974 5555 1234">
+        </div>
+        <div class="form-group">
+          <label for="address">Address / Location</label>
+          <input type="text" id="address" required placeholder="e.g. Al Sadd Street, Doha, Qatar">
+        </div>
+        <div class="form-group">
+          <label for="notes">Notes (optional)</label>
+          <textarea id="notes" placeholder="Anything worth remembering about this customer"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" id="submit-btn">Save Customer</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/nav.js"></script>
+  <script>
+    requireLogin();
+    renderNav('customers');
+
+    document.getElementById('new-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('submit-btn');
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+
+      try {
+        const payload = {
+          name: document.getElementById('name').value.trim(),
+          phone: document.getElementById('phone').value.trim(),
+          address: document.getElementById('address').value.trim(),
+          notes: document.getElementById('notes').value.trim()
+        };
+        const customer = await api.post('/customers', payload);
+        showToast('Customer saved.', 'success');
+        window.location.href = `/customer-detail.html?id=${encodeURIComponent(customer.id)}`;
+      } catch (err) {
+        showToast(err.message, 'error');
+        btn.disabled = false;
+        btn.textContent = 'Save Customer';
+      }
+    });
+  </script>
+</body>
+</html>
